@@ -5,6 +5,7 @@ from tqdm import tqdm
 import mindscope_utilities
 from allensdk.brain_observatory.behavior.trials_processing import calculate_reward_rate
 
+import pdb
 
 def build_tidy_cell_df(ophys_experiment, exclude_invalid_rois=True):
     '''
@@ -514,16 +515,19 @@ def get_stimulus_response_df(ophys_experiment,
     stacked_traces = traces.stack(multi_index=(
         'stimulus_presentations_id', unique_id_string)).transpose()
     num_repeats = len(stacked_traces)
-    trace_timestamps = np.repeat(
-        stacked_traces.coords['eventlocked_timestamps'].data[np.newaxis, :],
-        repeats=num_repeats, axis=0)
+    
+    # JP edit: since all timestamp traces are same, just return one copy of it!
+    # trace_timestamps = np.repeat(
+        # stacked_traces.coords['eventlocked_timestamps'].data[np.newaxis, :],
+        # repeats=num_repeats, axis=0)
+    stacked_traces = stacked_traces.astype('float32')  # 64 bit is excessive. Inspecting the data from one session, looks like maybe 0.01% of datapoints are less than 1e-7. So should be fine.
 
     # turn it all into a dataframe
     stimulus_response_df = pd.DataFrame({
         'stimulus_presentations_id': stacked_traces.coords['stimulus_presentations_id'],  # noqa E501
         unique_id_string: stacked_traces.coords[unique_id_string],
         'trace': list(stacked_traces.data),
-        'trace_timestamps': list(trace_timestamps),
+        # 'trace_timestamps': list(trace_timestamps),
         'mean_response': stacked_response.data,
         'baseline_response': stacked_baseline.data,
         'p_value_gray_screen': stacked_pval_gray_screen,
@@ -540,7 +544,7 @@ def get_stimulus_response_df(ophys_experiment,
     stimulus_response_df['output_sampling_rate'] = output_sampling_rate
     stimulus_response_df['response_window_duration'] = response_window_duration
 
-    return stimulus_response_df
+    return stimulus_response_df, stacked_traces.coords['eventlocked_timestamps'].data
 
 
 def add_rewards_to_stimulus_presentations(
